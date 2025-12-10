@@ -1,214 +1,182 @@
 // script.js
+const SERVER_URL = "http://127.0.0.1:5000";
 
-// --- 1. NAVIGATION ---
+// --- NAVIGATION ---
 function navigate(pageId) {
-    const sections = document.querySelectorAll('.section');
-    sections.forEach(sec => {
+    document.querySelectorAll('.section').forEach(sec => {
         sec.style.display = 'none';
         sec.classList.remove('active');
     });
-
-    const target = document.getElementById(pageId === 'login' ? 'login' : pageId);
+    const target = document.getElementById(pageId);
     if (target) {
         target.style.display = 'flex';
         setTimeout(() => target.classList.add('active'), 10);
     }
-
-    const navBtn = document.getElementById('nav-login-btn');
-    if (navBtn) {
-        if (pageId === 'dashboard') {
-            navBtn.innerText = 'Logout';
-            navBtn.onclick = logout;
-            navBtn.classList.replace('bg-blue-600', 'bg-red-500'); 
-        } else {
-            navBtn.innerText = 'Login';
-            navBtn.onclick = () => navigate('login');
-            navBtn.classList.replace('bg-red-500', 'bg-blue-600');
-        }
-    }
 }
 
-// --- 2. LOGIN LOGIC ---
-function handleLogin() {
-    const keyInput = document.getElementById('license-key').value.trim();
-    const statusDiv = document.getElementById('login-status');
-    const btn = document.getElementById('login-btn');
-
-    statusDiv.innerHTML = '';
+// --- LOGIN ---
+async function handleLogin() {
+    // 1. Get Key from Input
+    let keyInput = document.getElementById('license-key').value.trim();
     
+    // If empty, maybe check if we are auto-logging in from session
     if (!keyInput) {
-        statusDiv.innerHTML = '<span class="text-red-400">Please enter a key.</span>';
+        keyInput = sessionStorage.getItem('current_key');
+    }
+    
+    if (!keyInput) return;
+
+    // 2. Validate Key exists in keys.js
+    if (typeof ALLOWED_KEYS === 'undefined' || !ALLOWED_KEYS[keyInput]) {
+        showError("Invalid Key");
         return;
     }
 
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Checking...';
-    btn.disabled = true;
+    const keyConfig = ALLOWED_KEYS[keyInput];
+    const btn = document.getElementById('login-btn');
+    const status = document.getElementById('login-status');
 
-    setTimeout(() => {
-        if (typeof ALLOWED_KEYS !== 'undefined' && ALLOWED_KEYS.hasOwnProperty(keyInput)) {
-            const keyData = ALLOWED_KEYS[keyInput];
+    if(btn) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
+        btn.disabled = true;
+    }
+    if(status) status.innerHTML = "";
+
+    try {
+        // 3. Get/Create Device ID
+        let deviceId = localStorage.getItem('device_id');
+        if (!deviceId) {
+            deviceId = Math.random().toString(36).substring(2);
+            localStorage.setItem('device_id', deviceId);
+        }
+
+        // 4. Send to Python Server
+        // We send the expiry and limit FROM keys.js so Python can enforce them
+        const response = await fetch(`${SERVER_URL}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                key: keyInput, 
+                device_id: deviceId,
+                max_devices: keyConfig.maxDevices,
+                expiry: keyConfig.expiry 
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // SUCCESS
+            sessionStorage.setItem('current_key', keyInput);
             
-            // 1. Check Expiration
-            if (!checkExpiration(keyData.expiry).isValid) {
-                failLogin("Plan Finished.");
-                return;
+            // Restore Data
+            if (result.data) {
+                if(document.getElementById('home-name')) document.getElementById('home-name').value = result.data.hName || "";
+                if(document.getElementById('home-score')) document.getElementById('home-score').value = result.data.hScore || "";
+                if(document.getElementById('away-name')) document.getElementById('away-name').value = result.data.aName || "";
+                if(document.getElementById('away-score')) document.getElementById('away-score').value = result.data.aScore || "";
             }
 
-            // 2. Check Device Limit (STRICT MODE)
-            const deviceCheck = checkDeviceLimitStrict(keyInput, keyData.maxDevices);
-            if (!deviceCheck.allowed) {
-                failLogin(`Device Limit Reached (${deviceCheck.count}/${keyData.maxDevices}).`);
-                return;
-            }
-
-            // --- SUCCESS ---
-            statusDiv.innerHTML = '<span class="text-green-400 font-bold">Access Granted!</span>';
-            
-            sessionStorage.setItem('thumb_current_key', keyInput);
-
+            if(status) status.innerHTML = '<span class="text-green-400">Connected!</span>';
             setTimeout(() => {
-                loadUserData(); 
                 navigate('dashboard');
-                btn.disabled = false;
-                btn.innerHTML = 'Unlock';
-                document.getElementById('license-key').value = '';
-                startSecurityTimer();
+                startSecurityCheck(); // Start checking time
             }, 500);
-
         } else {
-            failLogin("Key not found.");
+            // FAILED (Expired or Limited)
+            showError(result.message);
+            if (result.message.includes("Expired") || result.message.includes("Finished")) {
+                 logout();
+            }
         }
-    }, 800);
 
-    function failLogin(msg) {
-        statusDiv.innerHTML = `<span class="text-red-500 font-bold">${msg}</span>`;
-        btn.innerHTML = 'Unlock';
-        btn.disabled = false;
+    } catch (error) {
+        console.error(error);
+        showError("Server Offline. Run server.py");
+    } finally {
+        if(btn) {
+            btn.innerHTML = 'Unlock';
+            btn.disabled = false;
+        }
     }
 }
 
-// --- 3. AUTO-SAVE ---
-function saveUserData() {
-    const currentKey = sessionStorage.getItem('thumb_current_key');
-    if (!currentKey) return;
-
-    const hName = document.getElementById('home-name');
-    const hScore = document.getElementById('home-score');
-    const aName = document.getElementById('away-name');
-    const aScore = document.getElementById('away-score');
-
-    if (hName && hScore && aName && aScore) {
-        const data = {
-            hName: hName.value,
-            hScore: hScore.value,
-            aName: aName.value,
-            aScore: aScore.value
-        };
-        localStorage.setItem('data_' + currentKey, JSON.stringify(data));
-    }
+function showError(msg) {
+    const status = document.getElementById('login-status');
+    if(status) status.innerHTML = `<span class="text-red-500 font-bold">${msg}</span>`;
 }
 
-function loadUserData() {
-    const currentKey = sessionStorage.getItem('thumb_current_key');
-    if (!currentKey) return;
+// --- SAVE DATA ---
+async function saveUserData() {
+    const key = sessionStorage.getItem('current_key');
+    if (!key) return;
 
-    const saved = localStorage.getItem('data_' + currentKey);
-    if (saved) {
-        const data = JSON.parse(saved);
-        if(document.getElementById('home-name')) document.getElementById('home-name').value = data.hName || "";
-        if(document.getElementById('home-score')) document.getElementById('home-score').value = data.hScore || "";
-        if(document.getElementById('away-name')) document.getElementById('away-name').value = data.aName || "";
-        if(document.getElementById('away-score')) document.getElementById('away-score').value = data.aScore || "";
-    }
+    const data = {
+        hName: document.getElementById('home-name').value,
+        hScore: document.getElementById('home-score').value,
+        aName: document.getElementById('away-name').value,
+        aScore: document.getElementById('away-score').value
+    };
+
+    // Save to Python
+    await fetch(`${SERVER_URL}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key, data: data })
+    });
 }
 
-// --- 4. STARTUP CHECK ---
-document.addEventListener("DOMContentLoaded", () => {
-    // Clean up old bugged keys
-    localStorage.removeItem('thumb_current_key');
+// --- LOGOUT ---
+async function logout() {
+    const key = sessionStorage.getItem('current_key');
+    const deviceId = localStorage.getItem('device_id');
 
-    const savedKey = sessionStorage.getItem('thumb_current_key');
+    if (key) {
+        try {
+            await fetch(`${SERVER_URL}/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: key, device_id: deviceId })
+            });
+        } catch(e) { console.log("Logout offline"); }
+    }
+
+    sessionStorage.removeItem('current_key');
+    // Clear inputs visually
+    document.getElementById('license-key').value = "";
+    if(document.getElementById('home-name')) document.getElementById('home-name').value = "";
+    if(document.getElementById('home-score')) document.getElementById('home-score').value = "";
+    if(document.getElementById('away-name')) document.getElementById('away-name').value = "";
+    if(document.getElementById('away-score')) document.getElementById('away-score').value = "";
     
-    if (savedKey && typeof ALLOWED_KEYS !== 'undefined' && ALLOWED_KEYS[savedKey]) {
-        if (checkExpiration(ALLOWED_KEYS[savedKey].expiry).isValid) {
-            navigate('dashboard');
-            loadUserData();
-            startSecurityTimer();
-        } else {
-            logout(); 
+    navigate('login');
+}
+
+// --- BACKGROUND CHECK (Time Limit) ---
+function startSecurityCheck() {
+    setInterval(() => {
+        const key = sessionStorage.getItem('current_key');
+        if(!key || typeof ALLOWED_KEYS === 'undefined') return;
+        
+        const config = ALLOWED_KEYS[key];
+        if(!config) return;
+
+        const now = new Date();
+        const expiry = new Date(config.expiry);
+
+        if (now > expiry) {
+            alert("Your plan has finished.");
+            logout();
         }
+    }, 5000); // Check every 5 seconds
+}
+
+// --- STARTUP ---
+document.addEventListener("DOMContentLoaded", () => {
+    // Check if we are already logged in (Refresh page support)
+    if (sessionStorage.getItem('current_key')) {
+        handleLogin();
     } else {
         navigate('home');
     }
 });
-
-// --- 5. HELPERS (STRICT ID SYSTEM) ---
-
-function getSessionId() {
-    // 1. Try to get ID from this specific tab (Session)
-    let id = sessionStorage.getItem('thumb_tab_id');
-    
-    // 2. If no ID (New Tab), create one
-    if (!id) {
-        id = Math.random().toString(36).substr(2, 9);
-        sessionStorage.setItem('thumb_tab_id', id);
-    }
-    return id;
-}
-
-function checkDeviceLimitStrict(key, maxLimit) {
-    const myId = getSessionId();
-    
-    // Get list of ALL active IDs for this key from Permanent Storage
-    let devices = JSON.parse(localStorage.getItem('devices_' + key) || '[]');
-    
-    // A. Am I already in the list? (I refreshed the page)
-    if (devices.includes(myId)) {
-        return { allowed: true, count: devices.length };
-    }
-    
-    // B. Is there space for me? (I am a new tab)
-    if (devices.length < maxLimit) {
-        devices.push(myId);
-        localStorage.setItem('devices_' + key, JSON.stringify(devices));
-        return { allowed: true, count: devices.length };
-    }
-    
-    // C. No space left
-    return { allowed: false, count: devices.length };
-}
-
-function checkExpiration(expiryString) {
-    return (new Date() > new Date(expiryString)) ? { isValid: false } : { isValid: true };
-}
-
-function logout() {
-    // When logging out, we should remove THIS tab's ID from the list
-    // so the slot becomes free again
-    const key = sessionStorage.getItem('thumb_current_key');
-    const myId = sessionStorage.getItem('thumb_tab_id');
-    
-    if (key && myId) {
-        let devices = JSON.parse(localStorage.getItem('devices_' + key) || '[]');
-        // Filter out my ID
-        devices = devices.filter(id => id !== myId);
-        localStorage.setItem('devices_' + key, JSON.stringify(devices));
-    }
-
-    sessionStorage.removeItem('thumb_current_key');
-    navigate('login');
-    if (window.securityInterval) clearInterval(window.securityInterval);
-}
-
-function startSecurityTimer() {
-    if (window.securityInterval) clearInterval(window.securityInterval);
-    window.securityInterval = setInterval(() => {
-        const key = sessionStorage.getItem('thumb_current_key');
-        if (key && ALLOWED_KEYS[key]) {
-             if (!checkExpiration(ALLOWED_KEYS[key].expiry).isValid) {
-                 alert("Time Up!");
-                 logout();
-             }
-        }
-    }, 5000);
-}
