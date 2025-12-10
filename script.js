@@ -48,27 +48,26 @@ function handleLogin() {
         if (typeof ALLOWED_KEYS !== 'undefined' && ALLOWED_KEYS.hasOwnProperty(keyInput)) {
             const keyData = ALLOWED_KEYS[keyInput];
             
-            // Check Expiration
+            // 1. Check Expiration
             if (!checkExpiration(keyData.expiry).isValid) {
                 failLogin("Plan Finished.");
                 return;
             }
 
-            // Check Device Limit
-            const deviceCheck = checkDeviceLimit(keyInput, keyData.maxDevices);
+            // 2. Check Device Limit (STRICT MODE)
+            const deviceCheck = checkDeviceLimitStrict(keyInput, keyData.maxDevices);
             if (!deviceCheck.allowed) {
-                failLogin("Device Limit Reached.");
+                failLogin(`Device Limit Reached (${deviceCheck.count}/${keyData.maxDevices}).`);
                 return;
             }
 
             // --- SUCCESS ---
             statusDiv.innerHTML = '<span class="text-green-400 font-bold">Access Granted!</span>';
             
-            // SAVE KEY TO SESSION ONLY (Deleted when browser closes)
             sessionStorage.setItem('thumb_current_key', keyInput);
 
             setTimeout(() => {
-                loadUserData(); // Load the saved team names
+                loadUserData(); 
                 navigate('dashboard');
                 btn.disabled = false;
                 btn.innerHTML = 'Unlock';
@@ -88,9 +87,8 @@ function handleLogin() {
     }
 }
 
-// --- 3. AUTO-SAVE (Data stays in Permanent Memory) ---
+// --- 3. AUTO-SAVE ---
 function saveUserData() {
-    // Get the key from the current active session
     const currentKey = sessionStorage.getItem('thumb_current_key');
     if (!currentKey) return;
 
@@ -106,7 +104,6 @@ function saveUserData() {
             aName: aName.value,
             aScore: aScore.value
         };
-        // Save DATA to Permanent Storage (localStorage) so it survives closing the browser
         localStorage.setItem('data_' + currentKey, JSON.stringify(data));
     }
 }
@@ -115,9 +112,7 @@ function loadUserData() {
     const currentKey = sessionStorage.getItem('thumb_current_key');
     if (!currentKey) return;
 
-    // Load DATA from Permanent Storage
     const saved = localStorage.getItem('data_' + currentKey);
-    
     if (saved) {
         const data = JSON.parse(saved);
         if(document.getElementById('home-name')) document.getElementById('home-name').value = data.hName || "";
@@ -127,53 +122,60 @@ function loadUserData() {
     }
 }
 
-// --- 4. STARTUP CHECK (The Fix) ---
+// --- 4. STARTUP CHECK ---
 document.addEventListener("DOMContentLoaded", () => {
-    
-    // --- STEP 1: NUCLEAR CLEANUP ---
-    // This line deletes the "Permanent" login key if the old code left it there.
-    localStorage.removeItem('thumb_current_key'); 
-    // -------------------------------
+    // Clean up old bugged keys
+    localStorage.removeItem('thumb_current_key');
 
-    // --- STEP 2: CHECK SESSION ---
-    // We only check sessionStorage. If you closed the browser, this will be empty.
     const savedKey = sessionStorage.getItem('thumb_current_key');
     
     if (savedKey && typeof ALLOWED_KEYS !== 'undefined' && ALLOWED_KEYS[savedKey]) {
-        // You just refreshed the page, so we keep you logged in
         if (checkExpiration(ALLOWED_KEYS[savedKey].expiry).isValid) {
             navigate('dashboard');
-            loadUserData(); // Restore your data
+            loadUserData();
             startSecurityTimer();
         } else {
             logout(); 
         }
     } else {
-        // You opened the browser fresh, so we force Login
         navigate('home');
     }
 });
 
-// --- 5. HELPERS ---
-function getDeviceId() {
-    let id = localStorage.getItem('thumb_device_id');
+// --- 5. HELPERS (STRICT ID SYSTEM) ---
+
+function getSessionId() {
+    // 1. Try to get ID from this specific tab (Session)
+    let id = sessionStorage.getItem('thumb_tab_id');
+    
+    // 2. If no ID (New Tab), create one
     if (!id) {
-        id = Math.random().toString(36).substr(2);
-        localStorage.setItem('thumb_device_id', id);
+        id = Math.random().toString(36).substr(2, 9);
+        sessionStorage.setItem('thumb_tab_id', id);
     }
     return id;
 }
 
-function checkDeviceLimit(key, maxLimit) {
-    const myId = getDeviceId();
+function checkDeviceLimitStrict(key, maxLimit) {
+    const myId = getSessionId();
+    
+    // Get list of ALL active IDs for this key from Permanent Storage
     let devices = JSON.parse(localStorage.getItem('devices_' + key) || '[]');
-    if (devices.includes(myId)) return { allowed: true };
+    
+    // A. Am I already in the list? (I refreshed the page)
+    if (devices.includes(myId)) {
+        return { allowed: true, count: devices.length };
+    }
+    
+    // B. Is there space for me? (I am a new tab)
     if (devices.length < maxLimit) {
         devices.push(myId);
         localStorage.setItem('devices_' + key, JSON.stringify(devices));
-        return { allowed: true };
+        return { allowed: true, count: devices.length };
     }
-    return { allowed: false };
+    
+    // C. No space left
+    return { allowed: false, count: devices.length };
 }
 
 function checkExpiration(expiryString) {
@@ -181,6 +183,18 @@ function checkExpiration(expiryString) {
 }
 
 function logout() {
+    // When logging out, we should remove THIS tab's ID from the list
+    // so the slot becomes free again
+    const key = sessionStorage.getItem('thumb_current_key');
+    const myId = sessionStorage.getItem('thumb_tab_id');
+    
+    if (key && myId) {
+        let devices = JSON.parse(localStorage.getItem('devices_' + key) || '[]');
+        // Filter out my ID
+        devices = devices.filter(id => id !== myId);
+        localStorage.setItem('devices_' + key, JSON.stringify(devices));
+    }
+
     sessionStorage.removeItem('thumb_current_key');
     navigate('login');
     if (window.securityInterval) clearInterval(window.securityInterval);
