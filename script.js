@@ -1,4 +1,4 @@
-// script.js - ADVANCED CUSTOM CONTROLS & SHAPES & SERVER-SIDE SECURITY
+// script.js - ADVANCED CUSTOM CONTROLS & SHAPES
 
 // --- 1. GLOBAL STATE & HISTORY ---
 let currentTemplate = 0;
@@ -751,174 +751,240 @@ function downloadImage() {
     });
 }
 
-// --- ADMIN & SECURITY SYSTEM (SERVER-SIDE INTEGRATION) ---
+// --- ADMIN & SECURITY SYSTEM ---
 
-const API_BASE = '/api'; // Backend entry point
+// 1. Configuration & Utils
+const ADMIN_HASH = "YWRtaW5fYWhtZWRfaGFyYl8yMDA5X3RodW1ic2NvcmU="; // Base64 of your admin key
 
 function getDeviceId() {
     let id = localStorage.getItem('thumb_device_id');
     if (!id) {
+        // Generate a persistent UUID for this browser
         id = 'dev_' + Date.now().toString(36) + Math.random().toString(36).substr(2);
         localStorage.setItem('thumb_device_id', id);
     }
     return id;
 }
 
-// 3. SECURE LOGIN FUNCTION (Async / Server Validated)
-window.handleLogin = async function() {
+// 2. Data Manager (Merges Static keys.js with Admin LocalStorage)
+function getAllLicenseKeys() {
+    const staticKeys = (typeof ALLOWED_KEYS !== 'undefined') ? ALLOWED_KEYS : {};
+    const dynamicKeys = JSON.parse(localStorage.getItem('thumb_dynamic_keys') || "{}");
+    return { ...staticKeys, ...dynamicKeys };
+}
+
+function getDeviceUsage(keyString) {
+    const usage = JSON.parse(localStorage.getItem('thumb_key_usage') || "{}");
+    const data = usage[keyString] || {};
+    // Ensure array structure is valid
+    if (!Array.isArray(data.devices)) data.devices = [];
+    if (!Array.isArray(data.blocked)) data.blocked = [];
+    return data;
+}
+
+function updateDeviceUsage(keyString, data) {
+    const usage = JSON.parse(localStorage.getItem('thumb_key_usage') || "{}");
+    usage[keyString] = data;
+    localStorage.setItem('thumb_key_usage', JSON.stringify(usage));
+}
+
+// 3. SECURE LOGIN FUNCTION
+window.handleLogin = function() {
     const inputKey = document.getElementById('license-key').value.trim();
     const status = document.getElementById('login-status');
     const btn = document.getElementById('login-btn');
-    const deviceId = getDeviceId();
+    
+    // Admin Backdoor Check
+    if (btoa(inputKey) === ADMIN_HASH) {
+        document.getElementById('license-key').value = '';
+        openAdminPanel();
+        return;
+    }
 
     status.innerHTML = '';
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
 
-    try {
-        const response = await fetch(`${API_BASE}/validate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: inputKey, deviceId: deviceId })
-        });
+    setTimeout(() => {
+        const allKeys = getAllLicenseKeys();
+        const licenseData = allKeys[inputKey];
 
-        const data = await response.json();
+        if (licenseData) {
+            const now = new Date();
+            const expiry = new Date(licenseData.expiry);
+            
+            // 1. Expiry Check
+            if (now > expiry) {
+                status.innerHTML = '<span class="text-red-500"><i class="fa-solid fa-clock"></i> Key Expired</span>';
+                btn.innerHTML = 'Unlock';
+                return;
+            }
 
-        if (data.isAdmin) {
-            document.getElementById('license-key').value = '';
-            btn.innerHTML = 'Unlock';
-            openAdminPanel(); // Function defined below
-            return;
-        }
+            // 2. Device Security Check (Strict Fix)
+            const deviceId = getDeviceId();
+            let usageData = getDeviceUsage(inputKey);
+            
+            // Fix: Parse maxDevices to Integer and use Set for uniqueness
+            const maxDev = parseInt(licenseData.maxDevices) || 1;
+            const deviceSet = new Set(usageData.devices);
 
-        if (data.valid) {
-            // Success: Store validated session
+            // Check if blocked
+            if (usageData.blocked.includes(deviceId)) {
+                status.innerHTML = '<span class="text-red-500 font-bold">DEVICE BLOCKED BY ADMIN</span>';
+                btn.innerHTML = 'Unlock';
+                return;
+            }
+
+            // Check device limit & Register
+            if (!deviceSet.has(deviceId)) {
+                if (deviceSet.size >= maxDev) {
+                    status.innerHTML = `<span class="text-red-500">Max Devices Reached (${maxDev})</span>`;
+                    btn.innerHTML = 'Unlock';
+                    return;
+                }
+                // Register new device
+                deviceSet.add(deviceId);
+                usageData.devices = Array.from(deviceSet);
+                updateDeviceUsage(inputKey, usageData);
+            }
+
+            // 3. Success
             sessionStorage.setItem('thumb_key', inputKey);
-            sessionStorage.setItem('thumb_user', JSON.stringify(data.license));
+            sessionStorage.setItem('thumb_user', JSON.stringify(licenseData));
             navigate('template-selection'); 
             btn.innerHTML = 'Unlock';
             document.getElementById('license-key').value = '';
+
         } else {
-            // Error: Show specific message from backend (Expired, Max Devices, Blocked)
-            status.innerHTML = `<span class="text-red-500 font-bold">${data.message}</span>`;
+            status.innerHTML = '<span class="text-red-500">Invalid Key</span>';
             btn.innerHTML = 'Unlock';
         }
-    } catch (error) {
-        console.error("Login Error:", error);
-        status.innerHTML = '<span class="text-red-500">Connection Failed</span>';
-        btn.innerHTML = 'Unlock';
-    }
+    }, 800);
 };
 
-// --- ADMIN UI LOGIC (Fetches from DB) ---
+// --- ADMIN UI LOGIC ---
 
-async function openAdminPanel() {
+function openAdminPanel() {
     document.getElementById('admin-panel-overlay').style.display = 'flex';
-    await renderAdminKeys();
+    renderAdminKeys();
 }
 
 function closeAdmin() {
     document.getElementById('admin-panel-overlay').style.display = 'none';
 }
 
-async function renderAdminKeys() {
+function renderAdminKeys() {
     const tbody = document.getElementById('admin-keys-table');
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-500">Loading...</td></tr>';
+    tbody.innerHTML = '';
+    const allKeys = getAllLicenseKeys();
+    const staticKeys = (typeof ALLOWED_KEYS !== 'undefined') ? ALLOWED_KEYS : {};
 
-    try {
-        const response = await fetch(`${API_BASE}/admin/keys`);
-        if(response.status === 403) return closeAdmin(); // Security check
-        const allKeys = await response.json();
-
-        tbody.innerHTML = '';
-        Object.keys(allKeys).forEach(k => {
-            const data = allKeys[k];
-            const isExpired = new Date() > new Date(data.expiry);
-            
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><span class="font-mono text-white">${k}</span></td>
-                <td>${data.name}</td>
-                <td><span class="badge badge-blue">${data.plan}</span></td>
-                <td class="${isExpired ? 'text-red-500' : 'text-green-400'}">
-                    ${new Date(data.expiry).toLocaleDateString()}
-                </td>
-                <td>
-                    <div class="flex flex-col gap-1">
-                        <span class="text-xs text-gray-400">${data.devices.length} / ${data.maxDevices} Used</span>
-                        ${data.devices.map(d => 
-                            `<div class="flex justify-between items-center bg-gray-800 p-1 rounded">
-                                <span class="text-[10px] font-mono truncate w-16">${d}</span>
-                                <button onclick="blockDevice('${k}', '${d}')" class="text-[9px] text-red-400 hover:text-white" title="Block"><i class="fa-solid fa-ban"></i></button>
-                            </div>`
-                        ).join('')}
-                        ${data.blocked && data.blocked.length > 0 ? `<div class="text-[9px] text-red-500 font-bold mt-1">${data.blocked.length} Blocked</div>` : ''}
-                    </div>
-                </td>
-                <td>
-                    <div class="flex gap-2">
-                        <button onclick="editKey('${k}')" class="admin-btn btn-blue">Edit</button>
-                        <button onclick="resetKeyDevices('${k}')" class="admin-btn btn-green">Reset</button>
-                        <button onclick="deleteKey('${k}')" class="admin-btn btn-red">Del</button>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (e) { console.error(e); }
+    Object.keys(allKeys).forEach(k => {
+        const data = allKeys[k];
+        const usage = getDeviceUsage(k);
+        const isStatic = staticKeys.hasOwnProperty(k);
+        const isExpired = new Date() > new Date(data.expiry);
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <span class="font-mono text-white">${k}</span>
+                ${isStatic ? '<span class="badge badge-blue ml-1">STATIC</span>' : ''}
+            </td>
+            <td>${data.name}</td>
+            <td><span class="badge badge-blue">${data.plan}</span></td>
+            <td class="${isExpired ? 'text-red-500' : 'text-green-400'}">
+                ${new Date(data.expiry).toLocaleDateString()}
+            </td>
+            <td>
+                <div class="flex flex-col gap-1">
+                    <span class="text-xs text-gray-400">${usage.devices.length} / ${data.maxDevices} Used</span>
+                    ${usage.devices.map(d => 
+                        `<div class="flex justify-between items-center bg-gray-800 p-1 rounded">
+                            <span class="text-[10px] font-mono truncate w-16">${d}</span>
+                            <button onclick="blockDevice('${k}', '${d}')" class="text-[9px] text-red-400 hover:text-white" title="Block Device"><i class="fa-solid fa-ban"></i></button>
+                        </div>`
+                    ).join('')}
+                    ${usage.blocked.length > 0 ? `<div class="text-[9px] text-red-500 font-bold mt-1">${usage.blocked.length} Blocked</div>` : ''}
+                </div>
+            </td>
+            <td>
+                <div class="flex gap-2">
+                    <button onclick="editKey('${k}')" class="admin-btn btn-blue">Edit</button>
+                    <button onclick="resetKeyDevices('${k}')" class="admin-btn btn-green">Reset Devs</button>
+                    ${!isStatic ? `<button onclick="deleteKey('${k}')" class="admin-btn btn-red">Delete</button>` : ''}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
-async function saveAdminKey() {
+function saveAdminKey() {
     const key = document.getElementById('adm-key').value.trim();
     if(!key) return alert("Key string required");
 
-    const payload = {
-        key: key,
+    const newKeyData = {
         name: document.getElementById('adm-name').value || "User",
         plan: document.getElementById('adm-plan').value,
         expiry: document.getElementById('adm-expiry').value || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
         maxDevices: parseInt(document.getElementById('adm-devices').value) || 1
     };
 
-    await fetch(`${API_BASE}/admin/keys`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
+    const dynamicKeys = JSON.parse(localStorage.getItem('thumb_dynamic_keys') || "{}");
+    dynamicKeys[key] = newKeyData;
+    localStorage.setItem('thumb_dynamic_keys', JSON.stringify(dynamicKeys));
     
     renderAdminKeys();
-    alert("Key Saved Globally!");
+    alert("Key Saved Successfully!");
 }
 
-async function deleteKey(key) {
+function deleteKey(key) {
     if(confirm("Delete this key permanently?")) {
-        await fetch(`${API_BASE}/admin/keys/${key}`, { method: 'DELETE' });
+        const dynamicKeys = JSON.parse(localStorage.getItem('thumb_dynamic_keys') || "{}");
+        delete dynamicKeys[key];
+        localStorage.setItem('thumb_dynamic_keys', JSON.stringify(dynamicKeys));
+        
+        const usage = JSON.parse(localStorage.getItem('thumb_key_usage') || "{}");
+        delete usage[key];
+        localStorage.setItem('thumb_key_usage', JSON.stringify(usage));
+        
         renderAdminKeys();
     }
 }
 
-async function resetKeyDevices(key) {
-    if(confirm("Clear all devices for this key?")) {
-        await fetch(`${API_BASE}/admin/device/reset`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key })
-        });
+function resetKeyDevices(key) {
+    if(confirm("Clear all registered devices for this key? User can login again on new devices.")) {
+        const usage = JSON.parse(localStorage.getItem('thumb_key_usage') || "{}");
+        if(usage[key]) {
+            usage[key].devices = [];
+            localStorage.setItem('thumb_key_usage', JSON.stringify(usage));
+        }
         renderAdminKeys();
     }
 }
 
-async function blockDevice(key, deviceId) {
-    if(confirm("Block this device ID?")) {
-        await fetch(`${API_BASE}/admin/device/block`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key, deviceId })
-        });
+function blockDevice(key, deviceId) {
+    if(confirm("Block this device ID from using this key?")) {
+        let usage = getDeviceUsage(key);
+        usage.devices = usage.devices.filter(d => d !== deviceId);
+        usage.blocked.push(deviceId);
+        updateDeviceUsage(key, usage);
         renderAdminKeys();
     }
 }
 
 function editKey(key) {
+    const all = getAllLicenseKeys();
+    const data = all[key];
+    if(!data) return;
+    
     document.getElementById('adm-key').value = key;
-    alert("Please re-enter details and click Save to update."); 
+    document.getElementById('adm-name').value = data.name;
+    document.getElementById('adm-plan').value = data.plan;
+    document.getElementById('adm-devices').value = data.maxDevices;
+    try {
+        const d = new Date(data.expiry);
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        document.getElementById('adm-expiry').value = d.toISOString().slice(0,16);
+    } catch(e) {}
 }
