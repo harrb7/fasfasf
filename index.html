@@ -7,7 +7,11 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+   
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script> 
     
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -87,7 +91,7 @@
 
                 <div class="price-card bg-[#1e293b] p-8 rounded-2xl border border-blue-500/50 relative overflow-hidden transform scale-105 shadow-2xl shadow-blue-900/20">
                     <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-400 to-cyan-300"></div>
-                    <div class="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">BEGINNER</div>
+                    <div class="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">ADVANCED</div>
                     <h3 class="text-2xl font-bold mb-2">1 Week</h3>
                     <div class="text-4xl font-bold text-blue-400 mb-6">$3.00</div>
                     <ul class="text-gray-300 space-y-3 mb-8 text-sm">
@@ -100,7 +104,7 @@
                 </div>
 
                 <div class="price-card bg-[#1e293b] p-8 rounded-2xl border border-gray-700 relative overflow-hidden group">
-                    <div class="absolute top-0 right-0 bg-green-500 text-gray-900 text-xs font-bold px-3 py-1 rounded-bl-lg">BEST VALUE</div>
+                    <div class="absolute top-0 right-0 bg-green-500 text-gray-900 text-xs font-bold px-3 py-1 rounded-bl-lg">ULTIMATE</div>
                     <h3 class="text-2xl font-bold mb-2">1 Month</h3>
                     <div class="flex items-baseline mb-6">
                         <span class="text-4xl font-bold text-blue-400 mr-3">$4.99</span>
@@ -229,6 +233,274 @@
                 </div>
             </div>
         </div>
+        <div id="template-selection" class="section flex-col items-center w-full px-4 pt-10 pb-10 overflow-y-auto">
+        <h2 class="text-4xl text-white font-bold mb-2">Select Template</h2>
+        <p class="text-gray-400 mb-8">Choose a professional style or build from scratch.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
+            <div class="bg-[#1e293b] p-4 rounded-xl border border-gray-700 hover:border-blue-500 cursor-pointer transition group" onclick="startEditor(1)">
+                <div class="h-32 bg-gray-900 rounded mb-3 overflow-hidden relative flex">
+                    <div class="w-1/2 bg-red-800"></div><div class="w-1/2 bg-blue-900"></div>
+                    <div class="absolute inset-0 flex items-center justify-center text-3xl font-black text-white">2 - 0</div>
+                </div>
+                <h3 class="text-white font-bold">Template 1</h3>
+                <p class="text-xs text-gray-400">Split Background (Liverpool Style)</p>
+            </div>
+
+            <div class="bg-[#1e293b] p-4 rounded-xl border border-gray-700 hover:border-blue-500 cursor-pointer transition group" onclick="startEditor(2)">
+                <div class="h-32 bg-gray-900 rounded mb-3 overflow-hidden relative flex items-center justify-center gap-1">
+                    <div class="text-4xl font-black text-white bg-blue-600 px-2 py-1 rounded">3</div>
+                    <div class="text-4xl font-black text-white bg-red-600 px-2 py-1 rounded">3</div>
+                </div>
+                <h3 class="text-white font-bold">Template 2</h3>
+                <p class="text-xs text-gray-400">Overlapping Big Score (Barca Style)</p>
+            </div>
+
+            <div class="bg-[#1e293b] p-4 rounded-xl border border-gray-700 hover:border-blue-500 cursor-pointer transition group" onclick="startEditor(3)">
+                <div class="h-32 bg-gray-900 rounded mb-3 overflow-hidden relative flex items-center justify-center">
+                    <div class="bg-blue-700 rounded-full px-4 py-2 flex items-center gap-2">
+                        <div class="w-4 h-4 bg-white"></div><span class="text-white font-bold">0-1</span><div class="w-4 h-4 bg-white"></div>
+                    </div>
+                </div>
+                <h3 class="text-white font-bold">Template 3</h3>
+                <p class="text-xs text-gray-400">Modern Pill Shape (Fulham Style)</p>
+            </div>
+
+            <div class="bg-[#1e293b] p-4 rounded-xl border-2 border-dashed border-gray-600 hover:border-blue-500 cursor-pointer transition group" onclick="startEditor(4)">
+                <div class="h-32 bg-gray-800/50 rounded mb-3 flex items-center justify-center">
+                    <i class="fa-solid fa-paintbrush text-4xl text-gray-500 group-hover:text-blue-500"></i>
+                </div>
+                <h3 class="text-white font-bold">Custom Template</h3>
+                <p class="text-xs text-gray-400">Drag & Drop Everything</p>
+            </div>
+        </div>
+
+        <div id="saved-layouts-area" class="w-full max-w-6xl mt-8 hidden">
+            <h3 class="text-gray-400 font-bold mb-4 border-b border-gray-700 pb-2">Your Saved Layouts</h3>
+            <div class="flex gap-4" id="saved-slots-container"></div>
+        </div>
+    </div>
+
+   <div id="editor-interface" class="section hidden w-full h-[calc(100vh-80px)] bg-[#0f172a] flex overflow-hidden">
+        
+        <div class="w-80 bg-[#1e293b] border-r border-gray-700 flex flex-col h-full z-20 shadow-2xl">
+            <div class="p-3 border-b border-gray-700 flex justify-between items-center bg-[#151e2e]">
+                <button onclick="navigate('template-selection')" class="text-xs text-gray-400 hover:text-white"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                <span class="text-blue-400 text-xs font-bold uppercase" id="editor-mode-title">Editor</span>
+            </div>
+
+            <div class="flex text-xs font-bold bg-gray-800">
+                <button class="flex-1 py-3 text-center bg-blue-600 text-white" id="tab-btn-teams" onclick="showTab('teams')">Teams</button>
+                <button class="flex-1 py-3 text-center text-gray-400 hover:text-white hover:bg-gray-700" id="tab-btn-style" onclick="showTab('style')">Style</button>
+                <button class="flex-1 py-3 text-center text-gray-400 hover:text-white hover:bg-gray-700" id="tab-btn-bg" onclick="showTab('bg')">BG</button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto p-4 custom-scroll space-y-4">
+                
+                <div id="tab-teams" class="editor-tab-content">
+                    <div class="relative mb-6">
+                        <label class="text-[10px] text-blue-400 font-bold uppercase mb-1 block">Search Database</label>
+                        <input type="text" id="db-search" placeholder="Type Real Madrid, Egypt..." class="w-full bg-gray-900 text-white text-sm p-2 rounded border border-gray-700 focus:border-blue-500 outline-none">
+                        <div id="db-results" class="absolute w-full bg-gray-800 border border-gray-600 max-h-40 overflow-y-auto hidden z-50 rounded-b shadow-xl"></div>
+                    </div>
+
+                    <div class="bg-gray-800 p-2 rounded border border-gray-700 mb-2">
+                        <label class="text-[10px] text-gray-500 font-bold uppercase">Home Team</label>
+                        <div class="flex gap-2 mb-1">
+                            <input type="text" id="ed-home-name" class="w-full bg-gray-900 text-white text-sm p-1 rounded border border-gray-600" placeholder="Name">
+                            <input type="file" id="up-home-logo" class="hidden">
+                            <label for="up-home-logo" class="bg-gray-700 text-white px-2 py-1 rounded text-xs cursor-pointer hover:bg-gray-600"><i class="fa-solid fa-upload"></i></label>
+                        </div>
+                        <input type="text" id="ed-home-score" class="w-16 bg-gray-900 text-white text-lg font-bold text-center p-1 rounded border border-gray-600" placeholder="0">
+                    </div>
+
+                    <div class="text-center mb-2">
+                         <input type="text" id="ed-separator" value="VS" class="w-12 text-center bg-gray-900 text-white text-xs p-1 rounded border border-gray-600">
+                    </div>
+
+                    <div class="bg-gray-800 p-2 rounded border border-gray-700">
+                        <label class="text-[10px] text-gray-500 font-bold uppercase">Away Team</label>
+                        <div class="flex gap-2 mb-1">
+                            <input type="text" id="ed-away-name" class="w-full bg-gray-900 text-white text-sm p-1 rounded border border-gray-600" placeholder="Name">
+                            <input type="file" id="up-away-logo" class="hidden">
+                            <label for="up-away-logo" class="bg-gray-700 text-white px-2 py-1 rounded text-xs cursor-pointer hover:bg-gray-600"><i class="fa-solid fa-upload"></i></label>
+                        </div>
+                        <input type="text" id="ed-away-score" class="w-16 bg-gray-900 text-white text-lg font-bold text-center p-1 rounded border border-gray-600" placeholder="0">
+                    </div>
+                </div>
+
+                <div id="tab-style" class="editor-tab-content hidden space-y-4">
+                    <div id="global-controls"></div>
+                    <div id="dynamic-color-controls"></div>
+                </div>
+
+                <div id="tab-bg" class="editor-tab-content hidden space-y-4">
+                     <div>
+                        <label class="text-[10px] text-gray-400 uppercase">Main Background</label>
+                        <div class="flex gap-2">
+                            <input type="color" id="ctl-bg-color" value="#0f172a" class="w-full h-8 cursor-pointer bg-transparent rounded border border-gray-600">
+                            <button id="ctl-bg-trans" class="text-xs bg-gray-700 text-white px-2 rounded hover:bg-gray-600">Transparent</button>
+                        </div>
+                    </div>
+                     <div>
+                        <label class="flex items-center space-x-2 cursor-pointer bg-gray-800 p-2 rounded border border-gray-700">
+                            <input type="checkbox" id="ctl-blur" class="accent-blue-500">
+                            <span class="text-xs text-white">Blur Background</span>
+                        </label>
+                    </div>
+                    
+                    <div id="advanced-properties" class="hidden pt-4 border-t border-gray-700 space-y-3">
+                        <div class="bg-blue-900/20 p-2 rounded border border-blue-500/30">
+                            <label class="text-[10px] text-blue-400 uppercase font-bold block mb-1">Selected Element</label>
+                            
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <div><label class="text-[9px] text-gray-500">X Position</label><input type="number" id="prop-x" class="w-full bg-gray-900 border border-gray-700 rounded p-1 text-xs text-white"></div>
+                                <div><label class="text-[9px] text-gray-500">Y Position</label><input type="number" id="prop-y" class="w-full bg-gray-900 border border-gray-700 rounded p-1 text-xs text-white"></div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <div><label class="text-[9px] text-gray-500">Width / Size</label><input type="number" id="prop-w" class="w-full bg-gray-900 border border-gray-700 rounded p-1 text-xs text-white"></div>
+                                <div><label class="text-[9px] text-gray-500">Height</label><input type="number" id="prop-h" class="w-full bg-gray-900 border border-gray-700 rounded p-1 text-xs text-white"></div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <div><label class="text-[9px] text-gray-500">Color</label><input type="color" id="prop-color" class="w-full h-6 rounded cursor-pointer"></div>
+                                <div><label class="text-[9px] text-gray-500">Opacity</label><input type="number" id="prop-opacity" step="0.1" min="0" max="1" class="w-full bg-gray-900 border border-gray-700 rounded p-1 text-xs text-white"></div>
+                            </div>
+
+                            <div id="group-font" class="hidden space-y-2 mb-2 border-t border-gray-700 pt-2">
+                                <label class="text-[9px] text-gray-400 uppercase font-bold">Typography</label>
+                                <select id="prop-font-family" class="w-full bg-gray-900 border border-gray-700 rounded p-1 text-xs text-white">
+                                    <option value="'Poppins', sans-serif">Poppins</option>
+                                    <option value="'Arial Black', sans-serif">Impact</option>
+                                    <option value="'Courier New', monospace">Courier</option>
+                                    <option value="'Times New Roman', serif">Serif</option>
+                                </select>
+                                <div class="flex gap-2">
+                                    <select id="prop-font-weight" class="w-1/2 bg-gray-900 border border-gray-700 rounded p-1 text-xs text-white">
+                                        <option value="400">Normal</option>
+                                        <option value="700">Bold</option>
+                                        <option value="900">Black</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="space-y-2 mb-2 border-t border-gray-700 pt-2">
+                                <label class="flex items-center space-x-2 text-[9px] text-gray-400 uppercase font-bold cursor-pointer">
+                                    <input type="checkbox" id="prop-shadow-toggle" class="accent-blue-500"> <span>Enable Shadow</span>
+                                </label>
+                                <div id="group-shadow" class="hidden space-y-1 pl-2 border-l border-gray-700">
+                                    <div class="flex gap-1"><input type="color" id="prop-shadow-color" class="w-6 h-6 rounded"><span class="text-[9px] pt-1">Color</span></div>
+                                    <div class="grid grid-cols-2 gap-1">
+                                        <input type="number" id="prop-shadow-x" placeholder="X" class="bg-gray-900 border border-gray-700 rounded p-1 text-[10px] text-white">
+                                        <input type="number" id="prop-shadow-y" placeholder="Y" class="bg-gray-900 border border-gray-700 rounded p-1 text-[10px] text-white">
+                                        <input type="number" id="prop-shadow-blur" placeholder="Blur" class="bg-gray-900 border border-gray-700 rounded p-1 text-[10px] text-white">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-2 mb-2 pt-2 border-t border-gray-700">
+                                <button onclick="changeLayer(1)" class="flex-1 bg-gray-700 text-[10px] py-1 rounded hover:bg-blue-600">Bring Fwd</button>
+                                <button onclick="changeLayer(-1)" class="flex-1 bg-gray-700 text-[10px] py-1 rounded hover:bg-blue-600">Send Back</button>
+                            </div>
+
+                            <button onclick="deleteSelected()" class="w-full bg-red-600 text-xs py-1 rounded text-white mt-1 hover:bg-red-500">Delete Element</button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="p-4 border-t border-gray-700 bg-[#151e2e]">
+                <button id="btn-save-custom" onclick="saveCustomLayout()" class="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded text-xs font-bold mb-2 hidden"><i class="fa-solid fa-save mr-1"></i> Save Layout</button>
+                <button class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded font-bold shadow-lg download-btn"><i class="fa-solid fa-download mr-1"></i> Download</button>
+            </div>
+        </div>
+
+        <div class="flex-grow relative flex items-center justify-center overflow-hidden checkerboard-bg z-10">
+            
+            <div id="vertical-toolbar" class="vertical-toolbar hidden">
+                <div class="tool-btn" onclick="undo()" title="Undo (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></div>
+                <div class="tool-btn" onclick="redo()" title="Redo (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></div>
+                
+                <div class="w-full h-px bg-gray-600 my-1"></div>
+                
+                <div class="tool-btn" onclick="addDynamic('score-home')" title="Score 1 (Home)">S1</div>
+                <div class="tool-btn" onclick="addDynamic('score-away')" title="Score 2 (Away)">S2</div>
+                <div class="tool-btn" onclick="addDynamic('logo-home')" title="Club 1 (Home Logo)"><i class="fa-solid fa-shield-halved text-blue-400"></i><small>H</small></div>
+                <div class="tool-btn" onclick="addDynamic('logo-away')" title="Club 2 (Away Logo)"><i class="fa-solid fa-shield-halved text-red-400"></i><small>A</small></div>
+                
+                <div class="tool-btn" onclick="toggleShapes()" title="Shapes" id="btn-shapes"><i class="fa-solid fa-shapes"></i>
+                    <div id="shapes-menu" class="shapes-popout hidden">
+                         <div class="tool-btn" onclick="addShape('circle')"><i class="fa-solid fa-circle"></i></div>
+                         <div class="tool-btn" onclick="addShape('square')"><i class="fa-solid fa-square"></i></div>
+                         <div class="tool-btn" onclick="addShape('rect')"><i class="fa-solid fa-ruler-horizontal"></i></div>
+                         <div class="tool-btn" onclick="addShape('rounded')"><i class="fa-regular fa-square"></i></div>
+                         <div class="tool-btn" onclick="addShape('shield')"><i class="fa-solid fa-shield"></i></div>
+                         <div class="tool-btn" onclick="addShape('badge')"><i class="fa-solid fa-certificate"></i></div>
+                         <div class="tool-btn" onclick="addShape('triangle')"><i class="fa-solid fa-play fa-rotate-270"></i></div>
+                         <div class="tool-btn" onclick="addShape('star')"><i class="fa-solid fa-star"></i></div>
+                         <div class="tool-btn" onclick="addShape('hexagon')"><i class="fa-solid fa-cube"></i></div>
+                         <div class="tool-btn" onclick="addShape('arrow')"><i class="fa-solid fa-arrow-right"></i></div>
+                         <div class="tool-btn" onclick="addShape('banner')"><i class="fa-solid fa-bookmark"></i></div>
+                         <div class="tool-btn" onclick="addText()"><i class="fa-solid fa-font"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="canvas-area" class="relative transition-all duration-200 select-none origin-center">
+                </div>
+             <div id="blur-layer" class="absolute inset-0 z-[-1] pointer-events-none transition-all duration-300"></div>
+        </div>
+    </div>
+
+
+
+
+    <div id="admin-panel-overlay" class="admin-overlay">
+    <div class="admin-box">
+        <div class="admin-header">
+            <h2 class="text-xl font-bold text-white"><i class="fa-solid fa-user-shield text-blue-500 mr-2"></i>Admin Control Panel</h2>
+            <button onclick="closeAdmin()" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        
+        <div class="admin-content custom-scroll">
+            <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Create / Edit License</h3>
+            <div class="admin-form-grid">
+                <input type="text" id="adm-key" placeholder="Key String (e.g. user_123)" class="bg-gray-800 text-white p-2 rounded border border-gray-600 text-xs">
+                <input type="text" id="adm-name" placeholder="User Name" class="bg-gray-800 text-white p-2 rounded border border-gray-600 text-xs">
+                <select id="adm-plan" class="bg-gray-800 text-white p-2 rounded border border-gray-600 text-xs">
+                    <option value="Personal">Personal</option>
+                    <option value="Standard">Standard</option>
+                    <option value="Enterprise">Enterprise</option>
+                </select>
+                <input type="datetime-local" id="adm-expiry" class="bg-gray-800 text-white p-2 rounded border border-gray-600 text-xs">
+                <input type="number" id="adm-devices" placeholder="Max Devices" value="1" class="bg-gray-800 text-white p-2 rounded border border-gray-600 text-xs">
+                <button onclick="saveAdminKey()" class="admin-btn btn-green font-bold"><i class="fa-solid fa-plus mr-1"></i> Save Key</button>
+            </div>
+
+            <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Active Licenses</h3>
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>User</th>
+                        <th>Plan</th>
+                        <th>Expiry</th>
+                        <th>Devices</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-keys-table">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+    <script src="teams_data.js"></script>
 
     </main>
 
