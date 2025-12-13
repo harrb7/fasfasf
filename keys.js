@@ -5,7 +5,7 @@ const ALLOWED_KEYS = {
     "key3": { 
         name: "Standard User", 
         plan: "Standard", 
-        expiry: "2025-12-10T13:53:00+02:00",
+        expiry: "2025-12-10T15:59:00+02:00",
         maxDevices: 2 
     },
 
